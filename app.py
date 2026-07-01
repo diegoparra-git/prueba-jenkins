@@ -1,3 +1,6 @@
+## @package app
+#  Aplicación Flask vulnerable para fines educativos de DevSecOps.
+#  Incluye métricas de Prometheus y rutas de búsqueda.
 from flask import Flask, request, render_template_string
 from prometheus_client import make_wsgi_app, Counter
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
@@ -5,7 +8,8 @@ from markupsafe import escape
 
 app = Flask(__name__)
 
-# Métrica para Prometheus y Grafana
+## @brief Contador global de peticiones HTTP.
+#  Se utiliza para exportar métricas hacia Prometheus.
 REQUESTS = Counter('http_requests_total', 'Total de peticiones HTTP')
 
 # Middleware para exponer métricas en /metrics
@@ -40,13 +44,18 @@ HTML_TEMPLATE = """
 
 ## @brief Ruta principal de la aplicación.
 #  @details Incrementa la métrica de Prometheus y renderiza la interfaz principal vacía.
+#  @return Una cadena HTML renderizada con un buscador.
 @app.route('/')
 def home():
     REQUESTS.inc()
     return render_template_string(HTML_TEMPLATE, result="")
 
 ## @brief Ruta de búsqueda (VULNERABLE A XSS).
-#  @details Recibe un parámetro 'q' por URL y lo refleja directamente en el HTML sin sanitizar, permitiendo inyección de scripts.
+#  @details Recibe un parámetro 'q' por URL y lo refleja directamente en el HTML.
+#  @warning Esta función es vulnerable a Cross-Site Scripting (XSS) ya que refleja 
+#           la entrada del usuario directamente sin sanitizar.
+#  @param q El término de búsqueda ingresado por el usuario.
+#  @return Renderiza la plantilla con el resultado de la búsqueda.
 @app.route('/buscar')
 def buscar():
     REQUESTS.inc()
