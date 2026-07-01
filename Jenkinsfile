@@ -33,9 +33,13 @@ pipeline {
         
         stage('Test - OWASP ZAP') {
             steps {
-                echo 'Ejecutando escaneo de vulnerabilidades con OWASP ZAP...'
-                // -v $WORKSPACE:/zap/wrk/:rw mapea la carpeta raíz de Jenkins a la de ZAP
-                // -r /zap/wrk/zap_report.html le dice a ZAP que guarde el archivo en la raíz del workspace
+                echo 'Levantando la aplicación temporal...'
+                sh 'docker run -d --name app_test -p 5001:5000 appsegura'
+
+                echo 'Esperando 10 segundos a que Flask inicie...'
+                sh 'sleep 10' // Pausa obligatoria
+
+                echo 'Ejecutando escaneo con OWASP ZAP...'
                 sh '''
                 docker run --rm -u root --network host \
                 -v $WORKSPACE:/zap/wrk/:rw \
