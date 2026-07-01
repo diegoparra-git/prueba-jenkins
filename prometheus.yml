@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: 'mi_app_segura'
+    static_configs:
+      # Cambiamos localhost:8080 por el nombre del contenedor y puerto 5000
+      - targets: ['appsegura:5000']

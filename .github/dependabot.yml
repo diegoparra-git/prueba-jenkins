@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # 1. Vigilar las dependencias de Python (requirements.txt o Pipfile)
+  - package-ecosystem: "pip"
+    directory: "/" 
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+
+  # 2. Vigilar la imagen base del contenedor en tu Dockerfile
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
