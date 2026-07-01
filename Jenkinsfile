@@ -76,7 +76,7 @@ pipeline {
                         
                         git commit -m "docs/sec: Actualización Doxygen y reporte ZAP" || echo "No hay cambios para commitear"
                         
-                        git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/DamagedGhost/test-jenkins.git HEAD:main
+                        git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/diegoparra-git/prueba-jenkins.git HEAD:main
                     '''
                 }
             }
