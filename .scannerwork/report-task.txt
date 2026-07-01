@@ -2,5 +2,5 @@ projectKey=flask-app
 serverUrl=http://sonarqube:9000
 serverVersion=26.6.0.123539
 dashboardUrl=http://sonarqube:9000/dashboard?id=flask-app
-ceTaskId=415fcbae-03c6-4021-b586-7bf959dabb52
-ceTaskUrl=http://sonarqube:9000/api/ce/task?id=415fcbae-03c6-4021-b586-7bf959dabb52
+ceTaskId=370f8eeb-0be4-4b8d-a799-743430b55d9b
+ceTaskUrl=http://sonarqube:9000/api/ce/task?id=370f8eeb-0be4-4b8d-a799-743430b55d9b
