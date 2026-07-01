@@ -31,24 +31,17 @@ pipeline {
             }
         }
         
-        stage('Test - OWASP ZAP') { 
-            // ETAPA: Pruebas Dinámicas (DAST)
+        stage('Test - OWASP ZAP') {
             steps {
-                echo 'Levantando la aplicación temporal para pruebas dinámicas...'
-                sh 'docker build -t appsegura .'
-                
-                // CAMBIO 1: Levantamos el contenedor de pruebas en el puerto 5001
-                sh 'docker run -d --name app_test -p 5001:5000 appsegura'
-                
                 echo 'Ejecutando escaneo de vulnerabilidades con OWASP ZAP...'
-                
-                // CAMBIO 2: Le decimos a ZAP que ataque el puerto 5001
+                // -v $WORKSPACE:/zap/wrk/:rw mapea la carpeta raíz de Jenkins a la de ZAP
+                // -r /zap/wrk/zap_report.html le dice a ZAP que guarde el archivo en la raíz del workspace
                 sh '''
-                docker run --rm -u root --network host -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-stable zap-baseline.py -t http://localhost:5001 -r zap_report.html || true
+                docker run --rm -u root --network host \
+                -v $WORKSPACE:/zap/wrk/:rw \
+                -t zaproxy/zap-stable \
+                zap-baseline.py -t http://localhost:5001 -r zap_report.html
                 '''
-                
-                echo 'Apagando entorno temporal de pruebas...'
-                sh 'docker stop app_test && docker rm app_test'
             }
         }
         
@@ -82,19 +75,12 @@ pipeline {
             }
         }
         
-        stage('Deploy') { 
-            // ETAPA: Despliegue a Producción 
+        stage('Deploy') {
             steps {
-                echo 'Desplegando la nueva versión con vulnerabilidades en producción...' 
-                
-                // Limpiamos cualquier versión anterior para evitar conflictos
-                sh 'docker stop appsegura || true'
-                sh 'docker rm appsegura || true'
-                
-                // Levantamos el contenedor final asegurando que:
-                // 1. Se llame 'appsegura' para que Prometheus lo encuentre
-                // 2. Se conecte a la red 'semana15_default' de tu docker-compose
-                sh 'docker run -d --name appsegura --network semana15_default -p 5000:5000 appsegura'
+                echo 'Desplegando la aplicación...'
+                // -f fuerza el borrado y || true evita que el pipeline se detenga si no existe
+                sh 'docker rm -f appsegura || true' 
+                sh 'docker run -d --name appsegura -p 5000:5000 appsegura'
             }
         }
     }
