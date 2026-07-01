@@ -15,6 +15,21 @@ pipeline {
                 sh 'pipenv check || true' 
             }
         }
+
+        stage('Analyze - SonarQube') {
+            steps {
+                // 'sonarqube' debe ser el nombre configurado en Configurar el sistema
+                script {
+                    scannerHome = tool 'sonar-scanner'
+                    withSonarQubeEnv('sonarqube') {
+                        // Ejecuta el escáner
+                        sh "${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=flask-app \
+                        -Dsonar.sources=."
+                    }
+                }
+            }
+        }
         
         stage('Test - OWASP ZAP') { 
             // ETAPA: Pruebas Dinámicas (DAST)
