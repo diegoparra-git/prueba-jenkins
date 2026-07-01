@@ -33,11 +33,15 @@ pipeline {
         
         stage('Test - OWASP ZAP') {
             steps {
+                echo 'Limpiando contenedores previos...'
+                // -f fuerza el borrado, || true evita error si no existe
+                sh 'docker rm -f app_test || true' 
+
                 echo 'Levantando la aplicación temporal...'
                 sh 'docker run -d --name app_test -p 5001:5000 appsegura'
 
                 echo 'Esperando 10 segundos a que Flask inicie...'
-                sh 'sleep 10' // Pausa obligatoria
+                sh 'sleep 10'
 
                 echo 'Ejecutando escaneo con OWASP ZAP...'
                 sh '''
@@ -46,6 +50,9 @@ pipeline {
                 -t zaproxy/zap-stable \
                 zap-baseline.py -t http://localhost:5001 -r zap_report.html || true
                 '''
+
+                echo 'Apagando entorno temporal de pruebas...'
+                sh 'docker rm -f app_test || true'
             }
         }
         
@@ -57,23 +64,18 @@ pipeline {
             }
         }
         
-        stage('Version Control') { 
-            // ETAPA: Control de versiones [cite: 177]
+        stage('Version Control') {
             steps {
-                echo 'Preparando commit con la nueva documentación y reportes...' 
-                
-                withCredentials([usernamePassword(credentialsId: 'GIT-TOKEN', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
+                echo 'Generando archivo de marca de tiempo...'
+                sh 'date > build_timestamp.txt'
+
+                withCredentials([usernamePassword(credentialsId: 'GIT-TOKEN', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USER')]) {
                     sh '''
-                        git config user.name "Jenkins Automator"
-                        git config user.email "jenkins@local"
-                        
-                        # Añadimos la documentación generada y el reporte de ZAP
-                        git add docs/
-                        git add zap_report.html || true
-                        
-                        git commit -m "docs/sec: Actualización Doxygen y reporte ZAP" || echo "No hay cambios para commitear"
-                        
-                        git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/diegoparra-git/prueba-jenkins.git HEAD:main
+                    git config user.name "Jenkins Automator"
+                    git config user.email "jenkins@local"
+                    git add .
+                    git commit -m "docs/sec: Actualización automática del pipeline" || echo "No hay cambios para commitear"
+                    git push https://${GIT_USER}:${GIT_PASSWORD}@github.com/diegoparra-git/prueba-jenkins.git HEAD:main
                     '''
                 }
             }
