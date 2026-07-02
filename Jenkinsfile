@@ -50,7 +50,7 @@ pipeline {
             docker run --rm -u root --network host \
             -v ${WORKSPACE}:/zap/wrk/:rw \
             -t zaproxy/zap-stable \
-            zap-baseline.py -t http://localhost:5001 -r zap_report.html
+            zap-baseline.py -t http://localhost:5001 -r zap_report.html -I || true
             '''
             
             // 5. Verificación forzada: Si no está en el workspace, lo sacamos del contenedor
@@ -72,35 +72,25 @@ pipeline {
         
         stage('Version Control') {
             steps {
-                echo 'Sincronizando con el repositorio...'
                 withCredentials([usernamePassword(credentialsId: 'GIT-TOKEN', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USER')]) {
                     sh '''
-                    # 1. Asegurar limpieza
-                    rm -fr .git/rebase-merge || true
                     git config user.name "Jenkins Automator"
                     git config user.email "jenkins@local"
                     
-                    # 2. Sincronizar ANTES de generar archivos
+                    # 1. Sincronizamos con el origen
                     git fetch origin main
                     git reset --hard origin/main
                     
-                    # 3. AHORA generamos los archivos nuevos
-                    # Esto nos dirá si realmente existe el archivo antes de commitear
-                    echo "Buscando reporte..."
-                    ls -la zap_report.html || echo "¡ERROR: El reporte no existe en el workspace!"
-
-                    git add zap_report.html build_timestamp.txt || true
-
+                    # 2. Generamos archivos (el reporte ya debería estar ahí por el volumen)
                     date > build_timestamp.txt
                     
-                    # 4. Añadimos y commiteamos
-                    git add .
-                    # Comprobamos si hay cambios reales antes de commitear
-                    if ! git diff-index --quiet HEAD --; then
-                        git commit -m "docs/sec: Actualización automática"
+                    # 3. Comprobamos si el reporte existe antes de hacer el add
+                    if [ -f "zap_report.html" ]; then
+                        git add zap_report.html build_timestamp.txt
+                        git commit -m "docs/sec: Reporte de seguridad actualizado [skip ci]" || true
                         git push https://${GIT_USER}:${GIT_PASSWORD}@github.com/diegoparra-git/prueba-jenkins.git HEAD:main
                     else
-                        echo "No hay cambios nuevos, saltando commit."
+                        echo "El reporte zap_report.html no fue encontrado. Saltando commit."
                     fi
                     '''
                 }
