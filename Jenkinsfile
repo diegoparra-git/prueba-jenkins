@@ -32,32 +32,34 @@ pipeline {
         }
         
         stage('Test - OWASP ZAP') {
-    steps {
-        script {
-            // 1. Limpiar
-            sh 'docker rm -f app_test || true'
-            
-            // 2. Construir
-            sh 'docker build -t appsegura .'
-            
-            // 3. Correr la app
-            sh 'docker run -d --name app_test -p 5001:5000 appsegura'
-            sh 'sleep 10'
-            
-            // 4. Ejecutar ZAP con copia explícita
-            // Creamos un contenedor ZAP y le decimos que guarde el reporte en /zap/wrk
-            sh '''
-            docker run --rm -u root --network host \
-            -v ${WORKSPACE}:/zap/wrk/:rw \
-            -t zaproxy/zap-stable \
-            zap-baseline.py -t http://localhost:5001 -r zap_report.html -I || true
-            '''
-            
-            // 5. Verificación forzada: Si no está en el workspace, lo sacamos del contenedor
-            // Si el mapeo falló, esto lo rescata
-            sh 'cp zap_report.html zap_report_backup.html || echo "No se pudo copiar el reporte"'
-            
-            sh 'docker rm -f app_test || true'
+            steps {
+                script {
+                    sh 'docker rm -f app_test || true'
+                    sh 'docker build -t appsegura .'
+                    sh 'docker run -d --name app_test -p 5001:5000 appsegura'
+                    sh 'sleep 10'
+                    
+                    // Ejecutamos ZAP sin mapeo de volumen complejo
+                    // Le pedimos que genere el reporte en /zap/wrk/zap_report.html
+                    sh '''
+                    docker run --rm -u root --network host \
+                    -v ${WORKSPACE}:/zap/wrk/:rw \
+                    -w /zap/wrk/ \
+                    -t zaproxy/zap-stable \
+                    zap-baseline.py -t http://localhost:5001 -r zap_report.html -I || true
+                    '''
+
+                    echo 'Ejecutando escaneo con OWASP ZAP...'
+                        sh '''
+                        # Corremos ZAP y le decimos que guarde en el directorio de trabajo del contenedor
+                        docker run --name zap_scanner --rm -u root --network host \
+                        -t zaproxy/zap-stable \
+                        zap-baseline.py -t http://localhost:5001 -r zap_report.html -I || true
+                        
+                        # Intentamos copiar el reporte desde el contenedor a la carpeta local
+                        # Nota: zap-baseline borra el contenedor al terminar, así que no podemos hacer docker cp.
+                        # ¡Necesitamos que el volumen funcione!
+                        '''
         }
     }
 }
