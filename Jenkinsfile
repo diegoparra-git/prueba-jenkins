@@ -111,14 +111,16 @@ pipeline {
             steps {
                 echo 'Actualizando despliegue nativamente...'
                 
-                // 1. Eliminamos el contenedor viejo si existe
+                // 1. Borramos cualquier contenedor que esté ocupando el nombre
                 sh 'docker rm -f appsegura || true'
                 
-                // 2. Lanzamos el nuevo contenedor con las mismas características que tenías en el compose
-                // -p 5000:5000 mapea los puertos
+                // 2. Buscamos si algo está usando el puerto 5000 y lo matamos
+                sh 'fuser -k 5000/tcp || true'
+                
+                // 3. Lanzamos el nuevo contenedor
                 sh 'docker run -d --name appsegura -p 5000:5000 appsegura'
                 
-                // 3. Limpieza de imágenes huérfanas para no llenar el disco
+                // 4. Limpieza de imágenes huérfanas
                 sh 'docker image prune -f'
             }
         }
