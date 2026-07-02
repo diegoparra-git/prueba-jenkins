@@ -8,7 +8,8 @@ from markupsafe import escape
 
 app = Flask(__name__)
 
-# Contador de peticiones HTTP para Prometheus y Grafana
+## @brief Contador global de peticiones HTTP.
+#  Se utiliza para exportar métricas hacia Prometheus. Contador de peticiones HTTP para Prometheus y Grafana
 REQUEST_COUNTER = Counter('flask_app_requests_total', 'Total de peticiones HTTP a la aplicación')
 
 ELASTICSEARCH_URL = 'http://elasticsearch:9200/flask-logs/_doc' # NOSONAR
@@ -26,22 +27,6 @@ def log_to_elastic(level, message, endpoint):
     except Exception as e:
         print(f"Error enviando log: {e}")
 
-
-@app.route('/')
-def home():
-    REQUEST_COUNTER.inc()  # Aumenta el contador en 1
-    return render_template_string(HTML_TEMPLATE, resultados=None)
-
-@app.route('/buscar')
-def buscar():
-    REQUEST_COUNTER.inc()  # Aumenta el contador en 1
-    q = request.args.get('q', '')
-    log_to_elastic("INFO", f"Usuario buscó el término: {q}", "/buscar")
-
-
-## @brief Contador global de peticiones HTTP.
-#  Se utiliza para exportar métricas hacia Prometheus.
-REQUESTS = Counter('http_requests_total', 'Total de peticiones HTTP')
 
 # Middleware para exponer métricas en /metrics
 app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
@@ -73,13 +58,15 @@ HTML_TEMPLATE = """
 </html>
 """
 
+
+
 ## @brief Ruta principal de la aplicación.
 #  @details Incrementa la métrica de Prometheus y renderiza la interfaz principal vacía.
 #  @return Una cadena HTML renderizada con un buscador.
 @app.route('/')
 def home():
-    REQUESTS.inc()
-    return render_template_string(HTML_TEMPLATE, result="")
+    REQUEST_COUNTER.inc()
+    return render_template_string(HTML_TEMPLATE, resultados=None)
 
 ## @brief Ruta de búsqueda (VULNERABLE A XSS).
 #  @details Recibe un parámetro 'q' por URL y lo refleja directamente en el HTML.
@@ -89,14 +76,14 @@ def home():
 #  @return Renderiza la plantilla con el resultado de la búsqueda.
 @app.route('/buscar')
 def buscar():
-    REQUESTS.inc()
+    REQUEST_COUNTER.inc()
     # Capturamos lo que el usuario escribió
     query = request.args.get('q', '')
-    
+    log_to_elastic("INFO", f"Usuario buscó el término: {query}", "/buscar")
     # VULNERABILIDAD: Reflejamos el input directamente concatenado
     mensaje = f"Resultados para la búsqueda: <b>{query}</b>" 
     
-    return render_template_string(HTML_TEMPLATE, result=mensaje)
+    return render_template_string(HTML_TEMPLATE, resultados=mensaje)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
