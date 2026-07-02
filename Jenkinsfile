@@ -32,31 +32,35 @@ pipeline {
         }
         
         stage('Test - OWASP ZAP') {
-            steps {
-                echo 'Limpiando contenedores previos...'
-                // -f fuerza el borrado, || true evita error si no existe
-                sh 'docker rm -f app_test || true' 
-
-                echo 'Levantando la aplicación temporal...'
-                sh 'docker build -t appsegura .'
-                sh 'docker run -d --name app_test -p 5001:5000 appsegura'
-
-                echo 'Esperando 10 segundos a que Flask inicie...'
-                sh 'sleep 10'
-
-                echo 'Ejecutando escaneo con límites de CPU...'
-                        sh '''
-                        docker run --rm -u root --network host \
-                        --cpus="0.5" \
-                        -v $(pwd):/zap/wrk/:rw \
-                        -t zaproxy/zap-stable \
-                        zap-baseline.py -t http://app_test:5000 -r zap_report.html || true
-                        '''
-
-                echo 'Apagando entorno temporal de pruebas...'
-                sh 'docker rm -f app_test || true'
-            }
+    steps {
+        script {
+            // 1. Limpiar
+            sh 'docker rm -f app_test || true'
+            
+            // 2. Construir
+            sh 'docker build -t appsegura .'
+            
+            // 3. Correr la app
+            sh 'docker run -d --name app_test -p 5001:5000 appsegura'
+            sh 'sleep 10'
+            
+            // 4. Ejecutar ZAP con copia explícita
+            // Creamos un contenedor ZAP y le decimos que guarde el reporte en /zap/wrk
+            sh '''
+            docker run --rm -u root --network host \
+            -v ${WORKSPACE}:/zap/wrk/:rw \
+            -t zaproxy/zap-stable \
+            zap-baseline.py -t http://localhost:5001 -r zap_report.html
+            '''
+            
+            // 5. Verificación forzada: Si no está en el workspace, lo sacamos del contenedor
+            // Si el mapeo falló, esto lo rescata
+            sh 'cp zap_report.html zap_report_backup.html || echo "No se pudo copiar el reporte"'
+            
+            sh 'docker rm -f app_test || true'
         }
+    }
+}
         
         stage('Generate Documentation') { 
             // ETAPA: Generación de documentación
@@ -81,13 +85,19 @@ pipeline {
                     git reset --hard origin/main
                     
                     # 3. AHORA generamos los archivos nuevos
+                    # Esto nos dirá si realmente existe el archivo antes de commitear
+                    echo "Buscando reporte..."
+                    ls -la zap_report.html || echo "¡ERROR: El reporte no existe en el workspace!"
+
+                    git add zap_report.html build_timestamp.txt || true
+
                     date > build_timestamp.txt
                     
                     # 4. Añadimos y commiteamos
                     git add .
                     # Comprobamos si hay cambios reales antes de commitear
                     if ! git diff-index --quiet HEAD --; then
-                        git commit -m "docs/sec: Actualización automática [skip ci]"
+                        git commit -m "docs/sec: Actualización automática"
                         git push https://${GIT_USER}:${GIT_PASSWORD}@github.com/diegoparra-git/prueba-jenkins.git HEAD:main
                     else
                         echo "No hay cambios nuevos, saltando commit."
