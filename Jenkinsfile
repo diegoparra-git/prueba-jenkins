@@ -44,13 +44,14 @@ pipeline {
                 echo 'Esperando 10 segundos a que Flask inicie...'
                 sh 'sleep 10'
 
-                echo 'Ejecutando escaneo con OWASP ZAP...'
-                sh '''
-                docker run --rm -u root --network host \
-                -v $WORKSPACE:/zap/wrk/:rw \
-                -t zaproxy/zap-stable \
-                zap-baseline.py -t http://localhost:5001 -r zap_report.html || true
-                '''
+                echo 'Ejecutando escaneo con límites de CPU...'
+                        sh '''
+                        docker run --rm -u root --network zap_net \
+                        --cpus="0.5" \
+                        -v $(pwd):/zap/wrk/:rw \
+                        -t zaproxy/zap-stable \
+                        zap-baseline.py -t http://app_test:5000 -r zap_report.html || true
+                        '''
 
                 echo 'Apagando entorno temporal de pruebas...'
                 sh 'docker rm -f app_test || true'
