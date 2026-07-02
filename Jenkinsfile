@@ -38,6 +38,7 @@ pipeline {
                 sh 'docker rm -f app_test || true' 
 
                 echo 'Levantando la aplicación temporal...'
+                sh 'docker build -t appsegura .'
                 sh 'docker run -d --name app_test -p 5001:5000 appsegura'
 
                 echo 'Esperando 10 segundos a que Flask inicie...'
@@ -57,7 +58,7 @@ pipeline {
         }
         
         stage('Generate Documentation') { 
-            // ETAPA: Generación de documentación [cite: 176, 177]
+            // ETAPA: Generación de documentación
             steps {
                 echo 'Generando documentación técnica automatizada...'
                 sh 'doxygen Doxyfile' 
@@ -86,7 +87,7 @@ pipeline {
                 echo 'Desplegando la aplicación...'
                 // -f fuerza el borrado y || true evita que el pipeline se detenga si no existe
                 sh 'docker rm -f appsegura || true' 
-                sh 'docker run -d --name appsegura -p 5000:5000 appsegura'
+                sh 'docker run -d --name appsegura -p 5002:5000 appsegura'
             }
         }
     }
