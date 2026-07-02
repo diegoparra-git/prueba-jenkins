@@ -14,7 +14,7 @@ app = Flask(__name__)
 #  Se utiliza para exportar métricas hacia Prometheus. Contador de peticiones HTTP para Prometheus y Grafana
 REQUEST_COUNTER = Counter('flask_app_requests_total', 'Total de peticiones HTTP a la aplicación')
 
-ELASTICSEARCH_URL = 'http://elasticsearch:9200/flask-logs/_doc' # NOSONAR
+ELASTICSEARCH_URL = 'http://host.docker.internal:9200/flask-logs/_doc' # NOSONAR
 
 def log_to_elastic(level, message, endpoint):
     log_data = {
