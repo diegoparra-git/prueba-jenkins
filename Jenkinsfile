@@ -40,19 +40,22 @@ pipeline {
                     sh 'sleep 10'
                     
                     echo 'Ejecutando escaneo con OWASP ZAP...'
-                    // Corremos ZAP con un nombre específico (zap_scanner)
                     sh '''
-                    docker run --name zap_scanner --rm -u root --network host \
+                    # 1. Damos permisos amplios al workspace para que ZAP (root en docker) pueda escribir el archivo
+                    chmod 777 .
+                    
+                    # 2. Corremos ZAP con el volumen obligatorio que exige (-v)
+                    docker run --rm -u root --network host \
+                    -v $(pwd):/zap/wrk/:rw \
                     -t zaproxy/zap-stable \
                     zap-baseline.py -t http://localhost:5001 -r zap_report.html -I || true
+                    
+                    # 3. Restauramos permisos por seguridad
+                    chmod 755 .
+                    
+                    # 4. Verificamos si existe, con "|| true" para que no rompa Jenkins si falla
+                    ls -lh zap_report.html || true
                     '''
-                    
-                   
-                    // Si el reporte se generó dentro de /zap/wrk/ en el contenedor, lo extraemos a la fuerza:
-                    sh 'docker cp zap_scanner:/zap/wrk/zap_report.html . || echo "El reporte no pudo ser extraído"'
-                    
-                    // Verificamos si existe
-                    sh 'ls -lh zap_report.html'
                     
                     sh 'docker rm -f app_test || true'
                 }
