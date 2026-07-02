@@ -1,19 +1,26 @@
-## @package app
-#  Aplicación Flask vulnerable para fines educativos de DevSecOps.
-#  Incluye métricas de Prometheus y rutas de búsqueda.
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string, session, redirect, url_for, flash
 from prometheus_client import make_wsgi_app, Counter
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
-from markupsafe import escape
+import sqlite3
+import os
+import hashlib
 import requests
 from datetime import datetime
 
 app = Flask(__name__)
+app.secret_key = os.urandom(24)
 
-## @brief Contador global de peticiones HTTP.
-#  Se utiliza para exportar métricas hacia Prometheus. Contador de peticiones HTTP para Prometheus y Grafana
+# ==========================================
+# 1. CONFIGURACIÓN DEVSECOPS: PROMETHEUS
+# ==========================================
 REQUEST_COUNTER = Counter('flask_app_requests_total', 'Total de peticiones HTTP a la aplicación')
+app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
+    '/metrics': make_wsgi_app()
+})
 
+# ==========================================
+# 2. CONFIGURACIÓN DEVSECOPS: ELASTICSEARCH
+# ==========================================
 ELASTICSEARCH_URL = 'http://host.docker.internal:9200/flask-logs/_doc' # NOSONAR
 
 def log_to_elastic(level, message, endpoint):
@@ -22,70 +29,131 @@ def log_to_elastic(level, message, endpoint):
         "level": level,
         "message": message,
         "endpoint": endpoint,
-        "app": "flask_appsegura"
+        "app": "task_manager_app"
     }
     try:
         requests.post(ELASTICSEARCH_URL, json=log_data, timeout=2)
-    except Exception as e:
-        print(f"Error enviando log: {e}")
+    except Exception:
+        pass # Ignoramos el error para no afectar la experiencia del usuario
 
+# ==========================================
+# LÓGICA DE LA APLICACIÓN
+# ==========================================
+def get_db_connection():
+    conn = sqlite3.connect('database.db')
+    conn.row_factory = sqlite3.Row
+    return conn
 
-# Middleware para exponer métricas en /metrics
-app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
-    '/metrics': make_wsgi_app()
-})
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Buscador DevSecOps</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f9; padding: 40px; }
-        .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 500px; margin: auto; text-align: center; }
-        input[type=text] { padding: 10px; width: 70%; border: 1px solid #ccc; border-radius: 4px; }
-        input[type=submit] { padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>Buscador de Registros Anormales</h2>
-        <form action="/buscar" method="GET">
-            <input type="text" name="q" placeholder="Ingresa tu búsqueda..." required>
-            <input type="submit" value="Buscar">
-        </form>
-        <p style="color: #555; margin-top: 20px;"><i>{{ result | safe }}</i></p>
-    </div>
-</body>
-</html>
-"""
-
-
-
-## @brief Ruta principal de la aplicación.
-#  @details Incrementa la métrica de Prometheus y renderiza la interfaz principal vacía.
-#  @return Una cadena HTML renderizada con un buscador.
 @app.route('/')
-def home():
+def index():
     REQUEST_COUNTER.inc()
-    return render_template_string(HTML_TEMPLATE, result="")
+    return 'Welcome to the Task Manager Application!'
 
-## @brief Ruta de búsqueda (VULNERABLE A XSS).
-#  @details Recibe un parámetro 'q' por URL y lo refleja directamente en el HTML.
-#  @warning Esta función es vulnerable a Cross-Site Scripting (XSS) ya que refleja 
-#           la entrada del usuario directamente sin sanitizar.
-#  @param q El término de búsqueda ingresado por el usuario.
-#  @return Renderiza la plantilla con el resultado de la búsqueda.
-@app.route('/buscar')
-def buscar():
+@app.route('/login', methods=['GET', 'POST'])
+def login():
     REQUEST_COUNTER.inc()
-    # Capturamos lo que el usuario escribió
-    query = request.args.get('q', '')
-    log_to_elastic("INFO", f"Usuario buscó el término: {query}", "/buscar")
-    # VULNERABILIDAD: Reflejamos el input directamente concatenado
-    mensaje = f"Resultados para la búsqueda: <b>{query}</b>" 
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        conn = get_db_connection()
+
+        # Inyección de SQL intencional
+        if "' OR '" in password:
+            log_to_elastic("WARN", f"Intento de inyección SQL detectado en el usuario: {username}", "/login")
+            query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
+            user = conn.execute(query).fetchone()
+        else:
+            query = "SELECT * FROM users WHERE username = ? AND password = ?"
+            hashed_password = hash_password(password)
+            user = conn.execute(query, (username, hashed_password)).fetchone()
+
+        if user:
+            session['user_id'] = user['id']
+            session['role'] = user['role']
+            log_to_elastic("INFO", f"Login exitoso para usuario ID: {user['id']}", "/login")
+            return redirect(url_for('dashboard'))
+        else:
+            log_to_elastic("WARN", f"Login fallido para username: {username}", "/login")
+            return 'Invalid credentials!'
+            
+    return '''
+        <form method="post">
+            Username: <input type="text" name="username"><br>
+            Password: <input type="password" name="password"><br>
+            <input type="submit" value="Login">
+        </form>
+    '''
+
+@app.route('/dashboard')
+def dashboard():
+    REQUEST_COUNTER.inc()
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
+    conn = get_db_connection()
+    tasks = conn.execute("SELECT * FROM tasks WHERE user_id = ?", (user_id,)).fetchall()
+    conn.close()
+
+    return render_template_string('''
+        <h1>Welcome, user {{ user_id }}!</h1>
+        <form action="/add_task" method="post">
+            <input type="text" name="task" placeholder="New task"><br>
+            <input type="submit" value="Add Task">
+        </form>
+        <h2>Your Tasks</h2>
+        <ul>
+        {% for task in tasks %}
+            <li>{{ task['task'] }} <a href="/delete_task/{{ task['id'] }}">Delete</a></li>
+        {% endfor %}
+        </ul>
+        <br><br><a href="/admin">Go to Admin Panel</a>
+    ''', user_id=user_id, tasks=tasks)
+
+@app.route('/add_task', methods=['POST'])
+def add_task():
+    REQUEST_COUNTER.inc()
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    task = request.form['task']
+    user_id = session['user_id']
+
+    conn = get_db_connection()
+    conn.execute("INSERT INTO tasks (user_id, task) VALUES (?, ?)", (user_id, task))
+    conn.commit()
+    conn.close()
     
-    return render_template_string(HTML_TEMPLATE, result=mensaje)
+    log_to_elastic("INFO", f"Usuario ID {user_id} añadió una nueva tarea.", "/add_task")
+    return redirect(url_for('dashboard'))
+
+@app.route('/delete_task/<int:task_id>')
+def delete_task(task_id):
+    REQUEST_COUNTER.inc()
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    conn.commit()
+    conn.close()
+
+    log_to_elastic("INFO", f"Usuario ID {session['user_id']} eliminó la tarea ID {task_id}.", "/delete_task")
+    return redirect(url_for('dashboard'))
+
+@app.route('/admin')
+def admin():
+    REQUEST_COUNTER.inc()
+    if 'user_id' not in session or session.get('role') != 'admin':
+        log_to_elastic("WARN", f"Intento de acceso no autorizado al panel admin por usuario ID: {session.get('user_id')}", "/admin")
+        return redirect(url_for('login'))
+
+    return 'Welcome to the admin panel!'
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # Modificado para funcionar dentro del contenedor Docker
+    app.run(host='0.0.0.0', port=5000, debug=True)
