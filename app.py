@@ -31,7 +31,7 @@ HTML_TEMPLATE = """
 </head>
 <body>
     <div class="container">
-        <h2>Buscador de Registros</h2>
+        <h2>Buscador de Registros Anormales</h2>
         <form action="/buscar" method="GET">
             <input type="text" name="q" placeholder="Ingresa tu búsqueda..." required>
             <input type="submit" value="Buscar">
