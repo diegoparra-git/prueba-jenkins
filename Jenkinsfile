@@ -25,7 +25,8 @@ pipeline {
                         // Ejecuta el escáner
                         sh "${scannerHome}/bin/sonar-scanner \
                         -Dsonar.projectKey=flask-app \
-                        -Dsonar.sources=."
+                        -Dsonar.sources=. \
+                        -Dsonar.exclusions=docs/**,zap_report*.html"
                     }
                 }
             }

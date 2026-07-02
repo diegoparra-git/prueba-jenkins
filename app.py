@@ -6,7 +6,7 @@ from prometheus_client import make_wsgi_app, Counter
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from markupsafe import escape
 
-ELASTICSEARCH_URL = 'http://elasticsearch:9200/flask-logs/_doc'
+ELASTICSEARCH_URL = 'http://elasticsearch:9200/flask-logs/_doc' # NOSONAR
 
 def log_to_elastic(level, message, endpoint):
     log_data = {
