@@ -109,10 +109,10 @@ pipeline {
         
         stage('Deploy') {
             steps {
-                echo 'Desplegando la aplicación...'
-                // -f fuerza el borrado y || true evita que el pipeline se detenga si no existe
-                sh 'docker rm -f appsegura || true' 
-                sh 'docker run -d --name appsegura -p 5000:5000 appsegura'
+                echo 'Actualizando despliegue mediante Docker Compose...'
+                // Jenkins le dice a compose que levante la nueva imagen
+                sh 'docker-compose up -d --no-deps --force-recreate appsegura'
+                sh 'docker image prune -f'
             }
         }
     }

@@ -6,6 +6,23 @@ from prometheus_client import make_wsgi_app, Counter
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from markupsafe import escape
 
+ELASTICSEARCH_URL = 'http://elasticsearch:9200/flask-logs/_doc'
+
+def log_to_elastic(level, message, endpoint):
+    log_data = {
+        "@timestamp": datetime.utcnow().isoformat(),
+        "level": level,
+        "message": message,
+        "endpoint": endpoint,
+        "app": "flask_appsegura"
+    }
+    try:
+        requests.post(ELASTICSEARCH_URL, json=log_data, timeout=2)
+    except Exception as e:
+        print(f"Error enviando log: {e}")
+
+
+
 app = Flask(__name__)
 
 ## @brief Contador global de peticiones HTTP.
