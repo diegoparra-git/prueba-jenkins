@@ -34,26 +34,37 @@ pipeline {
         stage('Test - OWASP ZAP') {
             steps {
                 script {
-                    sh 'docker rm -f app_test || true'
+                    // Limpieza previa profunda
+                    sh 'docker rm -f app_test zap_extractor || true'
+                    sh 'docker volume rm zap_reports || true'
+                    
                     sh 'docker build -t appsegura .'
                     sh 'docker run -d --name app_test -p 5001:5000 appsegura'
                     sh 'sleep 10'
                     
                     echo 'Ejecutando escaneo con OWASP ZAP...'
                     sh '''
-                    # 1. Permisos totales a la carpeta para que ZAP pueda escribir el reporte
-                    chmod 777 .
+                    # 1. Creamos un volumen manejado internamente por Docker (evita problemas de rutas)
+                    docker volume create zap_reports
                     
-                    # 2. Corremos ZAP CON EL VOLUMEN OBLIGATORIO (-v)
+                    # 2. Corremos ZAP usando el volumen nombrado. 
+                    # ZAP estará feliz y guardará el reporte dentro de "zap_reports"
                     docker run --rm -u root --network host \
-                    -v $(pwd):/zap/wrk/:rw \
+                    -v zap_reports:/zap/wrk/:rw \
                     -t zaproxy/zap-stable \
                     zap-baseline.py -t http://localhost:5001 -r zap_report.html -I || true
                     
-                    # 3. Restauramos los permisos normales
-                    chmod 755 .
+                    # 3. Creamos un contenedor "fantasma" conectado a ese mismo volumen
+                    docker create --name zap_extractor -v zap_reports:/data zaproxy/zap-stable
                     
-                    # 4. Verificamos que se haya creado sin detener el pipeline si falla
+                    # 4. Copiamos el reporte desde el contenedor fantasma a Jenkins
+                    docker cp zap_extractor:/data/zap_report.html .
+                    
+                    # 5. Limpiamos las evidencias
+                    docker rm -f zap_extractor || true
+                    docker volume rm zap_reports || true
+                    
+                    # 6. Comprobamos que el reporte ya está con nosotros
                     ls -lh zap_report.html || true
                     '''
                     
