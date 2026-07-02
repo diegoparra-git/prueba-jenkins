@@ -109,10 +109,17 @@ pipeline {
         
         stage('Deploy') {
             steps {
-                echo 'Actualizando despliegue mediante Docker Compose...'
-                // Intentamos usar el ejecutable directo. 
-                // Si 'docker compose' falló, 'docker-compose' (con guion) es el binario clásico.
-                sh '/usr/bin/docker-compose up -d --no-deps --force-recreate appsegura'
+                echo 'Actualizando despliegue nativamente...'
+                
+                // 1. Eliminamos el contenedor viejo si existe
+                sh 'docker rm -f appsegura || true'
+                
+                // 2. Lanzamos el nuevo contenedor con las mismas características que tenías en el compose
+                // -p 5000:5000 mapea los puertos
+                sh 'docker run -d --name appsegura -p 5000:5000 appsegura'
+                
+                // 3. Limpieza de imágenes huérfanas para no llenar el disco
+                sh 'docker image prune -f'
             }
         }
     }
