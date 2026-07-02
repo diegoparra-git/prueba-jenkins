@@ -96,7 +96,7 @@ pipeline {
                     # Usamos la ruta completa del workspace para añadir el archivo
                     if [ -f "${WORKSPACE}/zap_report.html" ]; then
                         git add "${WORKSPACE}/zap_report.html" "${WORKSPACE}/build_timestamp.txt"
-                        git commit -m "docs/sec: Reporte de seguridad actualizado [skip ci]" || true
+                        git commit -m "docs/sec: Reporte de seguridad actualizado" || true
                         git push https://${GIT_USER}:${GIT_PASSWORD}@github.com/diegoparra-git/prueba-jenkins.git HEAD:main
                     else
                         echo "¡ERROR! El reporte no existe en ${WORKSPACE}/zap_report.html"
@@ -112,7 +112,7 @@ pipeline {
                 echo 'Desplegando la aplicación...'
                 // -f fuerza el borrado y || true evita que el pipeline se detenga si no existe
                 sh 'docker rm -f appsegura || true' 
-                sh 'docker run -d --name appsegura -p 5002:5000 appsegura'
+                sh 'docker run -d --name appsegura -p 5000:5000 appsegura'
             }
         }
     }
