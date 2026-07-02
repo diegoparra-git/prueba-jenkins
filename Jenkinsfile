@@ -67,16 +67,25 @@ pipeline {
         
         stage('Version Control') {
             steps {
-                echo 'Generando archivo de marca de tiempo...'
+                echo 'Sincronizando y forzando commit...'
                 sh 'date > build_timestamp.txt'
 
                 withCredentials([usernamePassword(credentialsId: 'GIT-TOKEN', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USER')]) {
                     sh '''
+                    # 1. Limpieza de emergencias por si quedó un rebase a medias
+                    rm -fr .git/rebase-merge || true
+                    
+                    # 2. Configurar identidad
                     git config user.name "Jenkins Automator"
                     git config user.email "jenkins@local"
+                    
+                    # 3. Traer los últimos cambios y descartar conflictos locales
+                    git fetch origin main
+                    git reset --hard origin/main
+                    
+                    # 4. Añadir cambios, commitear y subir
                     git add .
-                    git commit -m "docs/sec: Actualización automática del pipeline [skip ci]" || true
-                    git pull --rebase origin main || true
+                    git commit -m "docs/sec: Actualización automática [skip ci]" || true
                     git push https://${GIT_USER}:${GIT_PASSWORD}@github.com/diegoparra-git/prueba-jenkins.git HEAD:main
                     '''
                 }
