@@ -96,7 +96,7 @@ pipeline {
                     
                     # Usamos la ruta completa del workspace para añadir el archivo
                     if [ -f "${WORKSPACE}/zap_report.html" ]; then
-                        git add "${WORKSPACE}/zap_report.html" "${WORKSPACE}/build_timestamp.txt"
+                        git add "${WORKSPACE}/zap_report.html" "docs/" "${WORKSPACE}/build_timestamp.txt"
                         git commit -m "docs/sec: Reporte de seguridad actualizado" || true
                         git push https://${GIT_USER}:${GIT_PASSWORD}@github.com/diegoparra-git/prueba-jenkins.git HEAD:main
                     else
