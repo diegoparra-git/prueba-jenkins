@@ -6,6 +6,11 @@ from prometheus_client import make_wsgi_app, Counter
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from markupsafe import escape
 
+app = Flask(__name__)
+
+# Contador de peticiones HTTP para Prometheus y Grafana
+REQUEST_COUNTER = Counter('flask_app_requests_total', 'Total de peticiones HTTP a la aplicación')
+
 ELASTICSEARCH_URL = 'http://elasticsearch:9200/flask-logs/_doc' # NOSONAR
 
 def log_to_elastic(level, message, endpoint):
@@ -22,8 +27,17 @@ def log_to_elastic(level, message, endpoint):
         print(f"Error enviando log: {e}")
 
 
+@app.route('/')
+def home():
+    REQUEST_COUNTER.inc()  # Aumenta el contador en 1
+    return render_template_string(HTML_TEMPLATE, resultados=None)
 
-app = Flask(__name__)
+@app.route('/buscar')
+def buscar():
+    REQUEST_COUNTER.inc()  # Aumenta el contador en 1
+    q = request.args.get('q', '')
+    log_to_elastic("INFO", f"Usuario buscó el término: {q}", "/buscar")
+
 
 ## @brief Contador global de peticiones HTTP.
 #  Se utiliza para exportar métricas hacia Prometheus.
