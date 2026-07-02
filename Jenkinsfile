@@ -75,7 +75,8 @@ pipeline {
                     git config user.name "Jenkins Automator"
                     git config user.email "jenkins@local"
                     git add .
-                    git commit -m "docs/sec: Actualización automática del pipeline" || echo "No hay cambios para commitear"
+                    git commit -m "docs/sec: Actualización automática del pipeline" || true
+                    git pull --rebase origin main || true
                     git push https://${GIT_USER}:${GIT_PASSWORD}@github.com/diegoparra-git/prueba-jenkins.git HEAD:main
                     '''
                 }
