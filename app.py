@@ -71,7 +71,7 @@ def login():
 
         # Inyección de SQL intencional
         if "' OR '" in password:
-            log_to_elastic("WARN", f"Intento de inyección SQL detectado en el usuario: {username}", "/login")
+            log_to_elastic("WARNING", f"Intento de inyección SQL detectado en el usuario: {username}", "/login")
             query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
             user = conn.execute(query).fetchone()
         else:
@@ -170,7 +170,7 @@ def delete_task(task_id):
 def admin():
     REQUEST_COUNTER.inc()
     if 'user_id' not in session or session.get('role') != 'admin':
-        log_to_elastic("WARN", f"Intento de acceso no autorizado al panel admin por usuario ID: {session.get('user_id')}", "/admin")
+        log_to_elastic("CRITICAL!", f"Intento de acceso no autorizado al panel admin por usuario ID: {session.get('user_id')}", "/admin")
         return redirect(url_for('login'))
 
     return 'Welcome to the admin panel!'
