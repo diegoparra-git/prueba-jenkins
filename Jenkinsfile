@@ -110,9 +110,9 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo 'Actualizando despliegue mediante Docker Compose...'
-                // Jenkins le dice a compose que levante la nueva imagen
-                sh 'docker compose up -d --no-deps --force-recreate appsegura'
-                sh 'docker image prune -f'
+                // Intentamos usar el ejecutable directo. 
+                // Si 'docker compose' falló, 'docker-compose' (con guion) es el binario clásico.
+                sh '/usr/bin/docker-compose up -d --no-deps --force-recreate appsegura'
             }
         }
     }
