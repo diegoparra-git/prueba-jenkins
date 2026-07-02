@@ -111,7 +111,7 @@ pipeline {
             steps {
                 echo 'Actualizando despliegue mediante Docker Compose...'
                 // Jenkins le dice a compose que levante la nueva imagen
-                sh 'docker-compose up -d --no-deps --force-recreate appsegura'
+                sh 'docker compose up -d --no-deps --force-recreate appsegura'
                 sh 'docker image prune -f'
             }
         }
