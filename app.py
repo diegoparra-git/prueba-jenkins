@@ -5,6 +5,8 @@ from flask import Flask, request, render_template_string
 from prometheus_client import make_wsgi_app, Counter
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from markupsafe import escape
+import requests
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -66,7 +68,7 @@ HTML_TEMPLATE = """
 @app.route('/')
 def home():
     REQUEST_COUNTER.inc()
-    return render_template_string(HTML_TEMPLATE, resultados=None)
+    return render_template_string(HTML_TEMPLATE, result="")
 
 ## @brief Ruta de búsqueda (VULNERABLE A XSS).
 #  @details Recibe un parámetro 'q' por URL y lo refleja directamente en el HTML.
@@ -83,7 +85,7 @@ def buscar():
     # VULNERABILIDAD: Reflejamos el input directamente concatenado
     mensaje = f"Resultados para la búsqueda: <b>{query}</b>" 
     
-    return render_template_string(HTML_TEMPLATE, resultados=mensaje)
+    return render_template_string(HTML_TEMPLATE, result=mensaje)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
