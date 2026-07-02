@@ -34,27 +34,27 @@ pipeline {
         stage('Test - OWASP ZAP') {
             steps {
                 script {
-                    sh 'docker rm -f app_test || true'
+                    sh 'docker rm -f app_test zap_scanner || true'
                     sh 'docker build -t appsegura .'
                     sh 'docker run -d --name app_test -p 5001:5000 appsegura'
                     sh 'sleep 10'
                     
                     echo 'Ejecutando escaneo con OWASP ZAP...'
                     sh '''
-                    # 1. Damos permisos amplios al workspace para que ZAP (root en docker) pueda escribir el archivo
-                    chmod 777 .
                     
-                    # 2. Corremos ZAP con el volumen obligatorio que exige (-v)
-                    docker run --rm -u root --network host \
-                    -v $(pwd):/zap/wrk/:rw \
+                    # El contenedor se detendrá al terminar, pero NO se borrará.
+                    docker run --name zap_scanner -u root --network host \
                     -t zaproxy/zap-stable \
                     zap-baseline.py -t http://localhost:5001 -r zap_report.html -I || true
                     
-                    # 3. Restauramos permisos por seguridad
-                    chmod 755 .
+                    # 2. Copiamos el reporte desde el contenedor detenido hacia Jenkins
+                    docker cp zap_scanner:/zap/wrk/zap_report.html .
                     
-                    # 4. Verificamos si existe, con "|| true" para que no rompa Jenkins si falla
-                    ls -lh zap_report.html || true
+                    # 3. Ahora sí, borramos el contenedor de ZAP
+                    docker rm -f zap_scanner || true
+                    
+                    # 4. Verificamos que el reporte esté a salvo
+                    ls -lh zap_report.html
                     '''
                     
                     sh 'docker rm -f app_test || true'
