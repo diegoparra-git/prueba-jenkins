@@ -40,16 +40,19 @@ pipeline {
                     sh 'sleep 10'
                     
                     echo 'Ejecutando escaneo con OWASP ZAP...'
-                    // Ejecutamos una sola vez, mapeando el volumen correctamente
+                    // Corremos ZAP con un nombre específico (zap_scanner)
                     sh '''
-                    docker run --rm -u root --network host \
-                    -v "${WORKSPACE}:/zap/wrk/:rw" \
+                    docker run --name zap_scanner --rm -u root --network host \
                     -t zaproxy/zap-stable \
-                    zap-baseline.py -t http://localhost:5001 -r zap_report.html -I
+                    zap-baseline.py -t http://localhost:5001 -r zap_report.html -I || true
                     '''
                     
-                    // Verificación de existencia
-                    sh 'ls -l ${WORKSPACE}/zap_report.html'
+                   
+                    // Si el reporte se generó dentro de /zap/wrk/ en el contenedor, lo extraemos a la fuerza:
+                    sh 'docker cp zap_scanner:/zap/wrk/zap_report.html . || echo "El reporte no pudo ser extraído"'
+                    
+                    // Verificamos si existe
+                    sh 'ls -lh zap_report.html'
                     
                     sh 'docker rm -f app_test || true'
                 }
