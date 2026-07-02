@@ -1,3 +1,6 @@
+## @package app
+#  Aplicación Flask de Gestor de Tareas vulnerable para evaluación DevSecOps.
+#  Incluye métricas de Prometheus y logs hacia Elasticsearch.
 from flask import Flask, request, render_template_string, session, redirect, url_for, flash
 from prometheus_client import make_wsgi_app, Counter
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
@@ -47,11 +50,16 @@ def get_db_connection():
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+## @brief Función principal de renderizado de la página de inicio.
+#  @return Mensaje de bienvenida.
 @app.route('/')
 def index():
     REQUEST_COUNTER.inc()
     return 'Welcome to the Task Manager Application!'
 
+## @brief Ruta de autenticación de usuarios (VULNERABLE A SQL INJECTION).
+#  @details Valida las credenciales contra la base de datos SQLite. Contiene un vector de inyección ' OR '.
+#  @return Redirección al dashboard si es exitoso, o mensaje de error.
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     REQUEST_COUNTER.inc()
@@ -88,6 +96,9 @@ def login():
         </form>
     '''
 
+## @brief Panel de control del usuario.
+#  @details Muestra las tareas correspondientes al user_id actual de la sesión.
+#  @return Plantilla HTML con las tareas.
 @app.route('/dashboard')
 def dashboard():
     REQUEST_COUNTER.inc()
@@ -114,6 +125,8 @@ def dashboard():
         <br><br><a href="/admin">Go to Admin Panel</a>
     ''', user_id=user_id, tasks=tasks)
 
+## @brief Añade una nueva tarea a la base de datos.
+#  @param task El texto de la tarea recibido por POST.
 @app.route('/add_task', methods=['POST'])
 def add_task():
     REQUEST_COUNTER.inc()
@@ -131,6 +144,9 @@ def add_task():
     log_to_elastic("INFO", f"Usuario ID {user_id} añadió una nueva tarea.", "/add_task")
     return redirect(url_for('dashboard'))
 
+## @brief Elimina una tarea de la base de datos (VULNERABLE A IDOR).
+#  @param task_id ID de la tarea a eliminar.
+#  @warning Esta función no valida si el task_id pertenece al usuario de la sesión actual.
 @app.route('/delete_task/<int:task_id>')
 def delete_task(task_id):
     REQUEST_COUNTER.inc()
@@ -145,6 +161,11 @@ def delete_task(task_id):
     log_to_elastic("INFO", f"Usuario ID {session['user_id']} eliminó la tarea ID {task_id}.", "/delete_task")
     return redirect(url_for('dashboard'))
 
+## @brief Panel de administración del sistema.
+#  @details Valida que el usuario actual tenga una sesión activa y posea el rol de 'admin'.
+#           Si se detecta un intento de acceso no autorizado (falta de sesión o permisos insuficientes), 
+#           registra una alerta de seguridad (WARN) en Elasticsearch y deniega el acceso.
+#  @return Un mensaje de bienvenida al panel si la validación es exitosa, o una redirección a la ruta de inicio de sesión.
 @app.route('/admin')
 def admin():
     REQUEST_COUNTER.inc()
