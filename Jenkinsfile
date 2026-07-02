@@ -46,7 +46,7 @@ pipeline {
 
                 echo 'Ejecutando escaneo con límites de CPU...'
                         sh '''
-                        docker run --rm -u root --network zap_net \
+                        docker run --rm -u root --network host \
                         --cpus="0.5" \
                         -v $(pwd):/zap/wrk/:rw \
                         -t zaproxy/zap-stable \
@@ -68,26 +68,30 @@ pipeline {
         
         stage('Version Control') {
             steps {
-                echo 'Sincronizando y forzando commit...'
-                sh 'date > build_timestamp.txt'
-
+                echo 'Sincronizando con el repositorio...'
                 withCredentials([usernamePassword(credentialsId: 'GIT-TOKEN', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USER')]) {
                     sh '''
-                    # 1. Limpieza de emergencias por si quedó un rebase a medias
+                    # 1. Asegurar limpieza
                     rm -fr .git/rebase-merge || true
-                    
-                    # 2. Configurar identidad
                     git config user.name "Jenkins Automator"
                     git config user.email "jenkins@local"
                     
-                    # 3. Traer los últimos cambios y descartar conflictos locales
+                    # 2. Sincronizar ANTES de generar archivos
                     git fetch origin main
                     git reset --hard origin/main
                     
-                    # 4. Añadir cambios, commitear y subir
+                    # 3. AHORA generamos los archivos nuevos
+                    date > build_timestamp.txt
+                    
+                    # 4. Añadimos y commiteamos
                     git add .
-                    git commit -m "docs/sec: Actualización automática [skip ci]" || true
-                    git push https://${GIT_USER}:${GIT_PASSWORD}@github.com/diegoparra-git/prueba-jenkins.git HEAD:main
+                    # Comprobamos si hay cambios reales antes de commitear
+                    if ! git diff-index --quiet HEAD --; then
+                        git commit -m "docs/sec: Actualización automática [skip ci]"
+                        git push https://${GIT_USER}:${GIT_PASSWORD}@github.com/diegoparra-git/prueba-jenkins.git HEAD:main
+                    else
+                        echo "No hay cambios nuevos, saltando commit."
+                    fi
                     '''
                 }
             }
